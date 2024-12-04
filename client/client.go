@@ -1,6 +1,8 @@
 package client
 
-import "net"
+import (
+	"net"
+)
 
 type KafkaClient struct {
 	conn net.Conn
@@ -19,6 +21,7 @@ func (r *KafkaClient) Send(request []byte) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

@@ -1,10 +1,7 @@
 package server
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
-	"io"
 	"net"
 
 	"github.com/hashicorp/go-hclog"
@@ -45,48 +42,26 @@ func (s *Server) Start() error {
 func (s *Server) handleRequest(conn net.Conn) {
 	defer conn.Close()
 	s.Logger.Info("Connected to client:", conn.RemoteAddr())
-	var buffer bytes.Buffer
-	reader := bufio.NewReader(conn)
-	for {
-		chunk := make([]byte, 1024) // Temporary buffer for reading chunks
-		n, err := reader.Read(chunk)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			s.Logger.Error("Error parsing response:", err)
-			return
-		}
-		_, err = buffer.Write(chunk[:n])
-		if err != nil {
-			if err == bytes.ErrTooLarge {
-				break
-			}
-			s.Logger.Error("Error writing to buffer:", err)
-			return
-		}
 
+	data, err := s.parseRequest(conn)
+	if err != nil {
+		s.Logger.Error("Error parsing request:", err)
+		return
 	}
-	// Process the complete received data
-	data := buffer.Bytes()
-	dataStr := string(data)
-	s.Logger.Info("Received request:", dataStr)
+	s.Logger.Info("Received request: ", data)
 
 }
 
-func (s *Server) generateResponse(conn net.Conn) ([][]byte, error) {
-	// buffer the conn
-	buffer := make([]byte, receiveBuf)
-	// start reading chunks delimited by newline byte
-
-	_, err := conn.Read(buffer)
-	if err != nil {
-		return nil, err
+func (s *Server) generateResponse(data string) ([][]byte, error) {
+	resp := make([][]byte, 0)
+	// get correlation id from data
+	// it starts after 16 characters
+	if len(data) < 24 {
+		return nil, fmt.Errorf("data too short")
 	}
-	// parse the request
-	parsedString := parseBulkBytes(buffer)
-	s.Logger.Info("Received request:", parsedString)
-	return [][]byte{
-		{0, 0, 0, 0, 0, 0, 0, 7},
-	}, nil
+	correlationID := data[16:24]
+	// send it back to client
+	corrIdBytes := []byte(correlationID)
+	resp = append(resp, corrIdBytes)
+	return resp, nil
 }
