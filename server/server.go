@@ -50,18 +50,27 @@ func (s *Server) handleRequest(conn net.Conn) {
 	}
 	s.Logger.Info("Received request: ", data)
 
+	resp, err := s.generateResponse(data)
+	if err != nil {
+		s.Logger.Error("Error generating response:", err)
+		return
+	}
+	s.Logger.Info("Sending response: ", resp)
+	// send response back to client
+	_, err = conn.Write([]byte(resp))
+	if err != nil {
+		s.Logger.Error("Error sending response:", err)
+		return
+	}
 }
 
-func (s *Server) generateResponse(data string) ([][]byte, error) {
-	resp := make([][]byte, 0)
+func (s *Server) generateResponse(data string) (string, error) {
 	// get correlation id from data
 	// it starts after 16 characters
 	if len(data) < 24 {
-		return nil, fmt.Errorf("data too short")
+		return "", fmt.Errorf("data too short")
 	}
 	correlationID := data[16:24]
 	// send it back to client
-	corrIdBytes := []byte(correlationID)
-	resp = append(resp, corrIdBytes)
-	return resp, nil
+	return correlationID, nil
 }
