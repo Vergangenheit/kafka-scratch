@@ -1,10 +1,11 @@
 package server
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"net"
-	"os"
 
 	"github.com/hashicorp/go-hclog"
 )
@@ -44,8 +45,11 @@ func (s *Server) Start() error {
 func (s *Server) handleRequest(conn net.Conn) {
 	defer conn.Close()
 	s.Logger.Info("Connected to client:", conn.RemoteAddr())
+	var buffer bytes.Buffer
+	reader := bufio.NewReader(conn)
 	for {
-		responses, err := s.generateResponse(conn)
+		chunk := make([]byte, 1024) // Temporary buffer for reading chunks
+		n, err := reader.Read(chunk)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -53,26 +57,21 @@ func (s *Server) handleRequest(conn net.Conn) {
 			s.Logger.Error("Error parsing response:", err)
 			return
 		}
-		for _, resp := range responses {
-			_, err = conn.Write(resp)
-			if err != nil {
-				s.Logger.Error("Error sending response:", err)
-				return
+		_, err = buffer.Write(chunk[:n])
+		if err != nil {
+			if err == bytes.ErrTooLarge {
+				break
 			}
+			s.Logger.Error("Error writing to buffer:", err)
+			return
 		}
-	}
 
-}
-
-func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
-	srv := NewServer("localhost", "9092", hclog.Default())
-	err := srv.Start()
-	if err != nil {
-		fmt.Println("Error starting server:", err)
-		os.Exit(1)
 	}
+	// Process the complete received data
+	data := buffer.Bytes()
+	dataStr := string(data)
+	s.Logger.Info("Received request:", dataStr)
+
 }
 
 func (s *Server) generateResponse(conn net.Conn) ([][]byte, error) {
@@ -84,6 +83,9 @@ func (s *Server) generateResponse(conn net.Conn) ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// parse the request
+	parsedString := parseBulkBytes(buffer)
+	s.Logger.Info("Received request:", parsedString)
 	return [][]byte{
 		{0, 0, 0, 0, 0, 0, 0, 7},
 	}, nil

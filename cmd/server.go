@@ -16,7 +16,7 @@ var (
 
 func init() {
 	// Add flags specific to the server command
-	serverStartCmd.Flags().StringVar(&port, "port", "6379", "port to run server from")
+	serverStartCmd.Flags().StringVar(&port, "port", "9092", "port to run server from")
 	serverStartCmd.Flags().StringVar(&host, "host", "localhost", "host address to run server from")
 
 	// Bind flags to Viper
